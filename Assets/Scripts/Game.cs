@@ -2,18 +2,12 @@
 
 public class Game : MonoBehaviour
 {        
-    private Net netScript;
     private Player player1;    
     private Player player2;
     private Player myPlayer, remotePlayer; //the game controls one player, it's player
-    private boost pad1;
-    private boost pad2;
-    public KeyCode up;
-    public KeyCode right;
-    public KeyCode down;
-    public KeyCode left;
-    private bool inputBased = false;
-    FakeNet fakeNet = new FakeNet(200, 0, 1);
+    private FakeNet net;
+    private float lastSendTime;
+    const float PacketSendInterval = (1000f / 10f) / 1000f;
 
     // Use this for initialization
     void Start ()
@@ -22,106 +16,87 @@ public class Game : MonoBehaviour
         //initialise the net object so we can use Net functions        
         player1 = GameObject.Find("Player1").GetComponent<Player>();
         player2 = GameObject.Find("Player2").GetComponent<Player>();
-        pad1 = GameObject.Find("Pad1").GetComponent<boost>();
-        pad2 = GameObject.Find("Pad2").GetComponent<boost>();
-        netScript = GetComponent<Net>();
-    }
 
-    //tell the game which player it controls
-    public void setPlayer(byte id)
-    {
-        if (id == 0)
-        {
-            myPlayer = player1;
-            remotePlayer = player2;
-        }
-        else
-        {
-            myPlayer = player2;
-            remotePlayer = player1;
-        }
+        net = new FakeNet(0, 0, 0);
+        lastSendTime = 0;
     }
 
     // Update is called once per frame
     void Update ()
     {
-        netScript.SelfUpdate();
+        net.ProcessMessages();
+        string message = net.Receive();
         HandleInput();        
-        pad1.SelfUpdate();
-        pad2.SelfUpdate();
-        fakeNet.Update();
 
-        if (netScript.getConnected())
+        if (net.GetConnected())
         {
-            myPlayer.SelfUpdate(remotePlayer.GetComponent<CircleCollider2D>().bounds.center);
-            remotePlayer.SelfUpdate(myPlayer.GetComponent<CircleCollider2D>().bounds.center);
+            myPlayer.SelfUpdate(remotePlayer.GetPosition());
+            remotePlayer.SelfUpdate(myPlayer.GetPosition());
 
-            if (!inputBased)
+            if (message != "")
             {
-                string[] data = new string[3];
-                data[0] = (myPlayer.GetComponent<Rigidbody2D>().position.x).ToString();
-                data[1] = (myPlayer.GetComponent<Rigidbody2D>().position.y).ToString();
-                data[2] = (myPlayer.GetComponent<Rigidbody2D>().rotation).ToString();
-                string concatenatedInput = string.Join("|", data);
-                concatenatedInput += "|false";
-                //netScript.Send(concatenatedInput);
-                fakeNet.Send(new Message(concatenatedInput));
+                remotePlayer.DeserializeData(message);
+            }
+
+            if (Time.time - lastSendTime > PacketSendInterval)
+            {
+                net.Send(myPlayer.SerializeData());
+                lastSendTime = Time.time;
             }
         }
-    }
-
-    public void movePlayer(string message)
-    {
-        remotePlayer.DeserializeData(message);
     }
 
     private void HandleInput()
     {
         //check if game is connected and a key is pressed, no point sending input based data continually
-        if (netScript.getConnected())
+        if (net.GetConnected())
         {
             if (Input.anyKey)
             {
-                //switch between state and input based on the press of space
-                if (Input.GetKeyDown(KeyCode.Space))
-                {
-                    inputBased = !inputBased;
-                }
-
                 //store each of the possible directions in an array
                 string[] keys = new string[4];
 
-                if (Input.GetKey(right))
+                if (Input.GetKey(KeyCode.D))
                 {
                     keys[0] = "Right";
                 }
 
-                if (Input.GetKey(down))
+                if (Input.GetKey(KeyCode.S))
                 {
                     keys[1] = "Down";
                 }
 
-                if (Input.GetKey(left))
+                if (Input.GetKey(KeyCode.A))
                 {
                     keys[2] = "Left";
                 }
 
-                if (Input.GetKey(up))
+                if (Input.GetKey(KeyCode.W))
                 {
                     keys[3] = "Up";
                 }
-
-                string concatenatedInput = string.Join("|", keys);
-                concatenatedInput += "|true";
-
-                if (inputBased)
-                {                    
-                    //netScript.Send(concatenatedInput);
-                    fakeNet.Send(new Message(concatenatedInput));
-                }
-                                
-                myPlayer.DeserializeData(concatenatedInput);
+                myPlayer.HandleInput(keys);
             }            
         }               
-    }       
+    }
+
+    public void SetupA()
+    {
+        myPlayer = player1;
+        remotePlayer = player2;
+        net.SetupA();
+    }
+
+    public void SetupB()
+    {
+        myPlayer = player2;
+        remotePlayer = player1;
+        net.SetupB();
+    }
+
+    public void Connect()
+    {
+        net.Connect();
+    }
+
 }

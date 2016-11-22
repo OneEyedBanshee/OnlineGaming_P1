@@ -5,7 +5,7 @@ using System.Runtime.Serialization.Formatters.Binary;
 using System.IO;
 using UnityEngine.UI;
 
-public class Net : MonoBehaviour
+public class Net
 {
     //private string[] ips = { "149.153.106.174", "149.153.106.153" }; //my own and Stephen's IP addresses, mine is index 0, his is index 1
     private string[] ips = { "127.0.0.1", "127.0.0.1" }; //my own and Stephen's IP addresses, mine is index 0, his is index 1
@@ -18,16 +18,10 @@ public class Net : MonoBehaviour
     private int socketId;
     private int clientConnectionId;
     private bool connected = false;
-    private Game gameScript;
-
-    public Button SetupAButton;
-    public Button SetupBButton;
-    public Button ConnectButton;
 
     // Use this for initialization
-    void Start ()
+    public Net ()
     {
-        gameScript = GetComponent<Game>();
         NetworkTransport.Init();
         config = new ConnectionConfig();
         channelId = config.AddChannel(QosType.Reliable);
@@ -40,10 +34,9 @@ public class Net : MonoBehaviour
         ip_remote = ips[1];
         port = 8001;
         port_remote = 8000;
-        gameScript.setPlayer(0);
 
-        SetupAButton.interactable = false;
-        SetupBButton.interactable = false;
+        GameObject.Find("SetupAButt").GetComponent<Button>().interactable = false;
+        GameObject.Find("SetupBButt").GetComponent<Button>().interactable = false;
 
         HostTopology topology = new HostTopology(config, 10);
         socketId = NetworkTransport.AddHost(topology, port);
@@ -57,10 +50,9 @@ public class Net : MonoBehaviour
         ip_remote = ips[0];
         port = 8000;
         port_remote = 8001;
-        gameScript.setPlayer(1);
 
-        SetupAButton.interactable = false;
-        SetupBButton.interactable = false;
+        GameObject.Find("SetupAButt").GetComponent<Button>().interactable = false;
+        GameObject.Find("SetupBButt").GetComponent<Button>().interactable = false;
 
         HostTopology topology = new HostTopology(config, 10);
         socketId = NetworkTransport.AddHost(topology, port);
@@ -91,28 +83,18 @@ public class Net : MonoBehaviour
         Debug.Log("Me: " + ip + ":" + port);
     }
 
-    // Update is called once per frame
-    public void SelfUpdate()
-    {
-        Receive();        
-    }
-
     public void Connect()
     {      
         byte error = 0;
         clientConnectionId = NetworkTransport.Connect(socketId, ip_remote, port_remote, 0, out error);
         connected = true;
-        ConnectButton.interactable = false;
 
-        Vector3 pos = SetupAButton.transform.position;
-        pos.x += 1000;
-
-        SetupAButton.transform.position = pos;
-        SetupBButton.transform.position = pos;
-        ConnectButton.transform.position = pos;
+        GameObject.Find("SetupAButt").SetActive(false);
+        GameObject.Find("SetupBButt").SetActive(false);
+        GameObject.Find("ConnectButt").SetActive(false);
     }
 
-    public bool getConnected()
+    public bool GetConnected()
     {
         return connected;
     }
@@ -129,8 +111,10 @@ public class Net : MonoBehaviour
         NetworkTransport.Send(socketId, clientConnectionId, channelId, buffer, (int)stream.Position, out error);
     }
 
-    void Receive()
+    public string Receive()
     {
+        string data = "";
+
         int socketId_remote;
         int clientConnectionId_remote;
         int channelId_remote;
@@ -145,27 +129,22 @@ public class Net : MonoBehaviour
                                                                  bufferSize,
                                                                  out dataSize,
                                                                  out error);
-
         switch (receivedData)
         {
             case NetworkEventType.Nothing:         //1
                 break;
             case NetworkEventType.ConnectEvent:    //2              
                 Debug.Log("Connect event");
-                //connecting = false;
                 break;
             case NetworkEventType.DataEvent:       //3
                 Stream stream = new MemoryStream(recBuffer);
                 BinaryFormatter formatter = new BinaryFormatter();
-                string message = formatter.Deserialize(stream) as string;
-                gameScript.movePlayer(message);             
+                data = formatter.Deserialize(stream) as string;           
                 break;
             case NetworkEventType.DisconnectEvent: //4
                 break;
         }
+
+        return data;
     }
 }
-
-//spent 20 minutes
-//spent another 15
-

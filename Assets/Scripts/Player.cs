@@ -5,8 +5,20 @@ using System.Runtime.Serialization.Formatters.Binary;
 using System.IO;
 
 public class Player : MonoBehaviour {
-    
+
+    struct PositionalData
+    {
+        public float x;
+        public float y;
+        public float r;
+    }
+    PositionalData startPosData;
+    PositionalData endPosData;
+    float elapsedPacketTime;
+    const float PacketSendInterval = (1000f / 10f) / 1000f;
+
     //public string charName;
+    public Collider2D otherPlayerCollider;
     private string charName = "player";
     Rigidbody2D rb;
     public bool chasing;
@@ -19,11 +31,12 @@ public class Player : MonoBehaviour {
 
     private bool collided = false;
 
-    
+    const float DefaultPosData = -1000f;
 
     // Use this for initialization
     void Start()
     {
+        rb = GetComponent<Rigidbody2D>();
         guiStyle.richText = true;   
         guiStyle.alignment = TextAnchor.MiddleCenter;
 
@@ -31,22 +44,19 @@ public class Player : MonoBehaviour {
 
         Debug.Log(radius);
 
-        //set each player's personal text colour, only 2 players in this case
-        //if (charName == "Blue")
-            textColor = "<color=#668cff>";
-       // else
-            //textColor = "<color=#ff4d4d>";
+        textColor = "<color=#668cff>";
 
-        
+        startPosData.x = DefaultPosData;
+
+
+        Physics2D.IgnoreCollision(otherPlayerCollider, GetComponent<Collider2D>());
     }
 
     // Update is called once per frame
     public void SelfUpdate(Vector2 player2Pos)
     {
         currentTime = Time.time; //update time 
-        CheckCollision(player2Pos);
-
-        rb = GetComponent<Rigidbody2D>();
+        //CheckCollision(player2Pos);
 
         //teleport the player to the other side of the screen if they go through the edge holes
         if (rb.transform.position.x < -8.6f)
@@ -65,30 +75,33 @@ public class Player : MonoBehaviour {
         {
             rb.transform.position = new Vector2(rb.position.x, -4.85f);
         }
+
+        if (startPosData.x != DefaultPosData)
+        {
+            //float percent = (Time.time - endPosData.t) / (endPosData.t - startPosData.t);
+            elapsedPacketTime += Time.deltaTime;
+            float percent = elapsedPacketTime / PacketSendInterval;
+            rb.transform.position = new Vector2(Mathf.Lerp(startPosData.x, endPosData.x, percent), Mathf.Lerp(startPosData.y, endPosData.y, percent));
+            rb.rotation = Mathf.Lerp(startPosData.r, endPosData.r, percent);
+        }
     }
 
     private void CheckCollision(Vector2 player2Pos)
     {
-        rb = GetComponent<Rigidbody2D>();        
-
         if (rb.position.x + radius + radius > player2Pos.x
         && rb.position.x < player2Pos.x + radius + radius
         && rb.position.y + radius + radius > player2Pos.y
         && rb.position.y < player2Pos.y + radius + radius 
         && collided == false)
         {
-            //collision
-            //Debug.Log("COLLISION!!!!!!!!");
             collided = true;
         }
     }
 
-    public void moveInputBased(string[] directions)
+    public void HandleInput(string[] directions)
     {
-        rb = GetComponent<Rigidbody2D>(); //get the rigid body of the player
-
         //loop through the array for each direction in directions
-        for (int i = 0; i < directions.Length - 1; i++)
+        for (int i = 0; i < directions.Length; i++)
         {
             if (directions[i] != "")
             {
@@ -128,26 +141,33 @@ public class Player : MonoBehaviour {
         rb.drag = 0.75f;
     }
 
-    public void moveStateBased(string[] data)
+    public void DeserializeData(string data)
     {
-        rb = GetComponent<Rigidbody2D>();
-        rb.position = new Vector3(float.Parse(data[0]), float.Parse(data[1]), 0);
-        rb.rotation = float.Parse(data[2]);
-    }
-        
-    public void DeserializeData(string directions)
-    {
-        string[] directionsSplit; //an array to store the individual directions that will be extracted from the directions string
-        directionsSplit = directions.Split('|'); //deserialise the string containing all the directions passed in via directions         
+        string[] splitData;
+        splitData = data.Split('|');
 
-        if (directionsSplit[directionsSplit.Length - 1] == "true") //input based
+        //rb.position = new Vector2(float.Parse(splitData[0]), float.Parse(splitData[1]));
+        //rb.rotation = float.Parse(splitData[2]);
+        elapsedPacketTime = 0f;
+        if (startPosData.x == DefaultPosData)
         {
-            moveInputBased(directionsSplit);
+            startPosData.x = float.Parse(splitData[0]);
+            startPosData.y = float.Parse(splitData[1]);
+            startPosData.r = float.Parse(splitData[2]);
+            endPosData = startPosData;
         }
-        else //state based
+        else
         {
-            moveStateBased(directionsSplit);
-        }        
+            startPosData = endPosData;
+            endPosData.x = float.Parse(splitData[0]);
+            endPosData.y = float.Parse(splitData[1]);
+            endPosData.r = float.Parse(splitData[2]);
+        }
+    }
+
+    public string SerializeData()
+    {
+        return (rb.position.x + "|" + rb.position.y + "|" + rb.rotation);
     }
 
     //display the GUI, in this case it shows text on screen when conditions are right
@@ -164,10 +184,8 @@ public class Player : MonoBehaviour {
     {          
         if (collisionObject.gameObject.tag == "Player")
         {
-            //force the 2 players apart slightly on collision
-            Rigidbody2D rb = GetComponent<Rigidbody2D>();           
-            rb.AddForce(collisionObject.contacts[0].normal * 5.0f, ForceMode2D.Impulse);          
-
+            //force the 2 players apart slightly on collision         
+            //rb.AddForce(collisionObject.contacts[0].normal * 5.0f, ForceMode2D.Impulse);          
             if (chasing == true)
             {
                 chaseTime = currentTime - elapsedTime;          
@@ -191,5 +209,10 @@ public class Player : MonoBehaviour {
                 Component halo = GetComponent("Halo"); halo.GetType().GetProperty("enabled").SetValue(halo, true, null); //enable halo
             }            
         }
+    }
+
+    public Vector2 GetPosition()
+    {
+        return rb.position;
     }
 }
