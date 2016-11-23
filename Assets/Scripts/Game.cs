@@ -17,7 +17,7 @@ public class Game : MonoBehaviour
         player1 = GameObject.Find("Player1").GetComponent<Player>();
         player2 = GameObject.Find("Player2").GetComponent<Player>();
 
-        net = new FakeNet(0, 0, 0);
+        net = new FakeNet(0, 0, 90);
         lastSendTime = 0;
     }
 

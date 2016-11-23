@@ -146,8 +146,16 @@ public class Player : MonoBehaviour {
         string[] splitData;
         splitData = data.Split('|');
 
-        //rb.position = new Vector2(float.Parse(splitData[0]), float.Parse(splitData[1]));
-        //rb.rotation = float.Parse(splitData[2]);
+        if (elapsedPacketTime > PacketSendInterval * 1.5)
+        {
+            rb.position = new Vector2(float.Parse(splitData[0]), float.Parse(splitData[1]));
+            rb.rotation = float.Parse(splitData[2]);
+            endPosData.x = float.Parse(splitData[0]);
+            endPosData.y = float.Parse(splitData[1]);
+            endPosData.r = float.Parse(splitData[2]);
+            Debug.Log("ye");
+        }
+
         elapsedPacketTime = 0f;
         if (startPosData.x == DefaultPosData)
         {
@@ -167,7 +175,7 @@ public class Player : MonoBehaviour {
 
     public string SerializeData()
     {
-        return (rb.position.x + "|" + rb.position.y + "|" + rb.rotation);
+        return (rb.position.x + "|" + rb.position.y + "|" + rb.rotation + "|" + rb.velocity.x + "|" + rb.velocity.y);
     }
 
     //display the GUI, in this case it shows text on screen when conditions are right
